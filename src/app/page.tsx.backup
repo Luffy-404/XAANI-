@@ -1,0 +1,1081 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { SessionProvider, useSession } from 'next-auth/react'
+import { ThemeProvider } from 'next-themes'
+import { AnimatePresence, motion } from 'framer-motion'
+import { RouterProvider, useRouter } from '@/lib/router'
+import { CartProvider, useCart } from '@/lib/cart'
+
+import Navbar from '@/components/bookstore/Navbar'
+import Footer from '@/components/bookstore/Footer'
+import CartDrawer from '@/components/bookstore/CartDrawer'
+import HeroSection from '@/components/bookstore/HeroSection'
+import BookCard from '@/components/bookstore/BookCard'
+import BookDetail from '@/components/bookstore/BookDetail'
+import AuthForm from '@/components/bookstore/AuthForm'
+import CheckoutForm from '@/components/bookstore/CheckoutForm'
+import AdminDashboard from '@/components/bookstore/AdminDashboard'
+import AdminBookForm from '@/components/bookstore/AdminBookForm'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Search,
+  ShoppingBag,
+  Package,
+  Minus,
+  Plus,
+  Trash2,
+  User,
+  Mail,
+  Shield,
+  ArrowLeft,
+  CheckCircle2,
+  BookOpen,
+  Star,
+  ArrowRight,
+  Pencil,
+  Trash,
+  AlertTriangle,
+  SlidersHorizontal,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { format } from 'date-fns'
+
+/* ─── Home View ─── */
+function HomeView() {
+  const { navigate } = useRouter()
+  const [featuredBooks, setFeaturedBooks] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/books?featured=true&limit=6').then((r) => r.json()),
+      fetch('/api/categories').then((r) => r.json()),
+    ])
+      .then(([booksData, catsData]) => {
+        setFeaturedBooks(booksData.books || [])
+        setCategories(catsData || [])
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  return (
+    <div>
+      <HeroSection />
+
+      {/* Featured Books */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Featured Books</h2>
+            <p className="text-muted-foreground mt-1">Handpicked recommendations for you</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ page: 'shop' })}
+            className="gap-2"
+          >
+            View All
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 lg:gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-3">
+                <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : featuredBooks.length === 0 ? (
+          <div className="text-center py-12">
+            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold">No featured books yet</h3>
+            <p className="text-muted-foreground mt-1">Check back soon for new arrivals</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 lg:gap-6">
+            {featuredBooks.map((book: any) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Categories Section */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 border-t">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold tracking-tight">Browse Categories</h2>
+          <p className="text-muted-foreground mt-1">Find your next read by genre</p>
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {categories.map((cat: any) => (
+              <motion.button
+                key={cat.id}
+                whileHover={{ y: -2 }}
+                onClick={() => navigate({ page: 'shop', category: cat.slug })}
+                className="p-5 rounded-xl border border-border/50 bg-card text-left transition-shadow hover:shadow-md"
+              >
+                <h3 className="font-semibold text-sm">{cat.name}</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {cat._count?.books || 0} {(cat._count?.books || 0) === 1 ? 'book' : 'books'}
+                </p>
+              </motion.button>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/* ─── Shop View ─── */
+function ShopView() {
+  const { route } = useRouter()
+  const { navigate } = useRouter()
+  const initialCategory = route.page === 'shop' ? (route as any).category : undefined
+  const initialSearch = route.page === 'shop' ? (route as any).search : undefined
+
+  const [books, setBooks] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [fetchedKey, setFetchedKey] = useState('')
+  const [search, setSearch] = useState(initialSearch || '')
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory || '')
+  const [sortBy, setSortBy] = useState('createdAt')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+
+  const currentKey = `${search}-${selectedCategory}-${sortBy}-${page}`
+  const isLoading = fetchedKey !== currentKey
+
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((r) => r.json())
+      .then(setCategories)
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (selectedCategory) params.set('category', selectedCategory)
+    params.set('sort', sortBy)
+    params.set('order', 'desc')
+    params.set('page', page.toString())
+    params.set('limit', '12')
+
+    fetch(`/api/books?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) {
+          setBooks(data.books || [])
+          setTotalPages(data.pagination?.totalPages || 1)
+          setFetchedKey(currentKey)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBooks([])
+          setFetchedKey(currentKey)
+        }
+      })
+    return () => { cancelled = true }
+  }, [search, selectedCategory, sortBy, page])
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setPage(1)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8"
+    >
+      <h1 className="text-3xl font-bold tracking-tight mb-8">Shop</h1>
+
+      {/* Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+        <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search books by title, author..."
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" size="icon" variant="outline">
+            <Search className="h-4 w-4" />
+          </Button>
+        </form>
+
+        <div className="flex gap-2">
+          <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v === 'all' ? '' : v); setPage(1) }}>
+            <SelectTrigger className="w-[160px]">
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((cat: any) => (
+                <SelectItem key={cat.id} value={cat.slug}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(1) }}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt">Newest</SelectItem>
+              <SelectItem value="price">Price</SelectItem>
+              <SelectItem value="rating">Rating</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Results */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : books.length === 0 ? (
+        <div className="text-center py-20">
+          <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold">No books found</h3>
+          <p className="text-muted-foreground mt-1">Try adjusting your search or filters</p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => {
+              setSearch('')
+              setSelectedCategory('')
+              setPage(1)
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
+            {books.map((book: any) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-10">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page <= 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground px-3">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </motion.div>
+  )
+}
+
+/* ─── Cart Page ─── */
+function CartPage() {
+  const { navigate, goBack } = useRouter()
+  const { items, removeItem, updateQuantity, totalPrice, totalItems } = useCart()
+
+  const handleRemove = async (item: any) => {
+    try {
+      await removeItem(item.id)
+      toast.success(`Removed "${item.book.title}"`)
+    } catch {
+      toast.error('Failed to remove item')
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8"
+    >
+      <Button variant="ghost" size="sm" onClick={goBack} className="mb-6 gap-1">
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </Button>
+
+      <h1 className="text-3xl font-bold tracking-tight mb-8">Shopping Cart</h1>
+
+      {items.length === 0 ? (
+        <div className="text-center py-20">
+          <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold">Your cart is empty</h3>
+          <p className="text-muted-foreground mt-1">Browse our collection and add some books</p>
+          <Button className="mt-4" onClick={() => navigate({ page: 'shop' })}>
+            Browse Shop
+          </Button>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Cart Items */}
+          <div className="lg:col-span-2 space-y-4">
+            {items.map((item) => {
+              const price = item.book.discountPrice || item.book.price
+              return (
+                <Card key={item.id} className="border-border/50">
+                  <CardContent className="p-4 flex gap-4">
+                    <div
+                      className="h-28 w-20 shrink-0 rounded-md bg-muted overflow-hidden cursor-pointer"
+                      onClick={() => navigate({ page: 'book', slug: item.book.slug })}
+                    >
+                      <img
+                        src={item.book.image}
+                        alt={item.book.title}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold line-clamp-1">{item.book.title}</h3>
+                      <p className="text-sm text-muted-foreground">{item.book.author}</p>
+                      <div className="flex items-center gap-2 mt-3">
+                        <div className="flex items-center border rounded-lg">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            disabled={item.quantity >= item.book.stock}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end justify-between">
+                      <span className="font-semibold">${(price * item.quantity).toFixed(2)}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemove(item)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Summary */}
+          <Card className="border-border/50 h-fit sticky top-24">
+            <CardHeader>
+              <CardTitle className="text-lg">Order Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Items ({totalItems})</span>
+                <span>${totalPrice.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-green-600 font-medium">Free</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-semibold text-lg">
+                <span>Total</span>
+                <span>${totalPrice.toFixed(2)}</span>
+              </div>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => navigate({ page: 'checkout' })}
+              >
+                Proceed to Checkout
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate({ page: 'shop' })}
+              >
+                Continue Shopping
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+/* ─── Profile Page ─── */
+function ProfilePage() {
+  const { navigate, goBack } = useRouter()
+  const { data: session } = useSession()
+
+  if (!session?.user) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-xl font-semibold">Please sign in</h2>
+        <Button className="mt-4" onClick={() => navigate({ page: 'login' })}>Sign In</Button>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-8"
+    >
+      <Button variant="ghost" size="sm" onClick={goBack} className="mb-6 gap-1">
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </Button>
+
+      <h1 className="text-3xl font-bold tracking-tight mb-8">Profile</h1>
+
+      <Card className="border-border/50">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">{session.user.name}</h2>
+              <p className="text-sm text-muted-foreground">{session.user.email}</p>
+            </div>
+          </div>
+
+          <Separator className="my-6" />
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="text-sm font-medium">{session.user.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Role</p>
+                <Badge variant="secondary">{(session.user as any).role || 'customer'}</Badge>
+              </div>
+            </div>
+          </div>
+
+          <Separator className="my-6" />
+
+          <div className="flex flex-col gap-2">
+            <Button variant="outline" onClick={() => navigate({ page: 'orders' })} className="justify-start gap-2">
+              <Package className="h-4 w-4" />
+              My Orders
+            </Button>
+            {(session.user as any).role === 'admin' && (
+              <Button variant="outline" onClick={() => navigate({ page: 'admin' })} className="justify-start gap-2">
+                <Shield className="h-4 w-4" />
+                Admin Dashboard
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+/* ─── Orders Page ─── */
+function OrdersPage() {
+  const { navigate, goBack } = useRouter()
+  const { data: session } = useSession()
+  const [orders, setOrders] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!session?.user) return
+    fetch('/api/orders')
+      .then((r) => r.json())
+      .then(setOrders)
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [session])
+
+  if (!session?.user) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-xl font-semibold">Please sign in</h2>
+        <Button className="mt-4" onClick={() => navigate({ page: 'login' })}>Sign In</Button>
+      </div>
+    )
+  }
+
+  const statusColors: Record<string, string> = {
+    pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    delivered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8"
+    >
+      <Button variant="ghost" size="sm" onClick={goBack} className="mb-6 gap-1">
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </Button>
+
+      <h1 className="text-3xl font-bold tracking-tight mb-8">My Orders</h1>
+
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-lg" />
+          ))}
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-20">
+          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold">No orders yet</h3>
+          <p className="text-muted-foreground mt-1">Start shopping to see your orders here</p>
+          <Button className="mt-4" onClick={() => navigate({ page: 'shop' })}>Browse Shop</Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((order: any) => (
+            <Card key={order.id} className="border-border/50">
+              <CardContent className="p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-sm font-mono text-muted-foreground">#{order.id.slice(-8)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(new Date(order.createdAt), 'MMMM d, yyyy \'at\' h:mm a')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className={`text-xs ${statusColors[order.status] || ''}`}>
+                      {order.status}
+                    </Badge>
+                    <span className="font-semibold">${order.total.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {order.items?.map((item: any) => (
+                    <div key={item.id} className="shrink-0 flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                      <div className="h-10 w-8 rounded overflow-hidden bg-muted">
+                        <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium line-clamp-1 max-w-[120px]">{item.title}</p>
+                        <p className="text-[10px] text-muted-foreground">x{item.quantity}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+/* ─── Admin Book List ─── */
+function AdminBookList() {
+  const { navigate, goBack } = useRouter()
+  const [books, setBooks] = useState<any[] | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const isLoading = books === null
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/books?limit=100')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setBooks(data.books || [])
+      })
+      .catch(() => {
+        if (!cancelled) setBooks([])
+      })
+    return () => { cancelled = true }
+  }, [refreshKey])
+
+  const handleDelete = async (bookId: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return
+    try {
+      const res = await fetch(`/api/books/${bookId}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast.success(`"${title}" deleted`)
+        setRefreshKey((k) => k + 1)
+      } else {
+        toast.error('Failed to delete book')
+      }
+    } catch {
+      toast.error('Failed to delete book')
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8"
+    >
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={goBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold tracking-tight">Manage Books</h1>
+        </div>
+        <Button onClick={() => navigate({ page: 'admin-book-edit' })} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Add Book
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-64 rounded-lg" />
+      ) : (
+        <Card className="border-border/50">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Book</TableHead>
+                  <TableHead className="hidden sm:table-cell">Category</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead className="hidden md:table-cell">Stock</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {books.map((book: any) => (
+                  <TableRow key={book.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-9 shrink-0 rounded overflow-hidden bg-muted">
+                          <img src={book.image} alt={book.title} className="h-full w-full object-cover" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium line-clamp-1">{book.title}</p>
+                          <p className="text-xs text-muted-foreground">{book.author}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Badge variant="outline" className="text-xs">{book.category?.name || '—'}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium text-sm">${(book.discountPrice || book.price).toFixed(2)}</span>
+                      {book.discountPrice && (
+                        <span className="text-xs text-muted-foreground line-through ml-1">${book.price.toFixed(2)}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant={book.stock < 5 ? 'destructive' : 'secondary'} className="text-xs">
+                        {book.stock}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => navigate({ page: 'admin-book-edit', bookId: book.id })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(book.id, book.title)}
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  )
+}
+
+/* ─── Admin Order List ─── */
+function AdminOrderList() {
+  const { navigate, goBack } = useRouter()
+  const [orders, setOrders] = useState<any[] | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const isLoading = orders === null
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/orders')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setOrders(data)
+      })
+      .catch(() => {
+        if (!cancelled) setOrders([])
+      })
+    return () => { cancelled = true }
+  }, [refreshKey])
+
+  const handleStatusChange = async (orderId: string, status: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) {
+        toast.success('Order status updated')
+        setRefreshKey((k) => k + 1)
+      } else {
+        toast.error('Failed to update order')
+      }
+    } catch {
+      toast.error('Failed to update order')
+    }
+  }
+
+  const statusColors: Record<string, string> = {
+    pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    delivered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8"
+    >
+      <div className="flex items-center gap-3 mb-8">
+        <Button variant="ghost" size="icon" onClick={goBack}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-3xl font-bold tracking-tight">Manage Orders</h1>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-64 rounded-lg" />
+      ) : orders.length === 0 ? (
+        <div className="text-center py-20">
+          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold">No orders yet</h3>
+        </div>
+      ) : (
+        <Card className="border-border/50">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order: any) => (
+                  <TableRow key={order.id}>
+                    <TableCell className="font-mono text-xs">#{order.id.slice(-8)}</TableCell>
+                    <TableCell className="text-sm">
+                      {order.user?.name || order.user?.email || '—'}
+                    </TableCell>
+                    <TableCell className="text-sm">{order.items?.length || 0}</TableCell>
+                    <TableCell className="font-medium text-sm">${order.total.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={order.status}
+                        onValueChange={(value) => handleStatusChange(order.id, value)}
+                      >
+                        <SelectTrigger className="h-7 w-[120px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="shipped">Shipped</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {format(new Date(order.createdAt), 'MMM d, yyyy')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  )
+}
+
+/* ─── Order Success ─── */
+function OrderSuccessPage({ orderId }: { orderId: string }) {
+  const { navigate } = useRouter()
+  const [order, setOrder] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`/api/orders/${orderId}`)
+      .then((r) => r.json())
+      .then(setOrder)
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [orderId])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-xl px-4 sm:px-6 lg:px-8 py-20 text-center"
+    >
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', duration: 0.6, delay: 0.2 }}
+      >
+        <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 className="h-10 w-10 text-green-600" />
+        </div>
+      </motion.div>
+
+      <h1 className="text-3xl font-bold tracking-tight">Order Confirmed!</h1>
+      <p className="text-muted-foreground mt-3">
+        Thank you for your purchase. Your order has been placed successfully.
+      </p>
+
+      {isLoading ? (
+        <Skeleton className="h-24 mt-6 rounded-lg" />
+      ) : order ? (
+        <Card className="border-border/50 mt-8 text-left">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Order ID</span>
+              <span className="font-mono">#{order.id.slice(-8)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total</span>
+              <span className="font-semibold">${order.total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Status</span>
+              <Badge variant="secondary">{order.status}</Badge>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Items</span>
+              <span>{order.items?.length || 0}</span>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="flex flex-col sm:flex-row gap-3 mt-8 justify-center">
+        <Button onClick={() => navigate({ page: 'orders' })} className="gap-2">
+          <Package className="h-4 w-4" />
+          View Orders
+        </Button>
+        <Button variant="outline" onClick={() => navigate({ page: 'shop' })} className="gap-2">
+          <BookOpen className="h-4 w-4" />
+          Continue Shopping
+        </Button>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ─── Main App Content ─── */
+function AppContent() {
+  const { route } = useRouter()
+  const { totalItems } = useCart()
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
+
+  const renderView = () => {
+    switch (route.page) {
+      case 'home':
+        return <HomeView />
+      case 'shop':
+        return <ShopView />
+      case 'book':
+        return <BookDetail slug={(route as any).slug} />
+      case 'cart':
+        return <CartPage />
+      case 'checkout':
+        return <CheckoutForm />
+      case 'login':
+      case 'register':
+        return <AuthForm />
+      case 'profile':
+        return <ProfilePage />
+      case 'orders':
+        return <OrdersPage />
+      case 'order-success':
+        return <OrderSuccessPage orderId={(route as any).orderId} />
+      case 'admin':
+        return <AdminDashboard />
+      case 'admin-books':
+        return <AdminBookList />
+      case 'admin-book-edit':
+        return <AdminBookForm bookId={(route as any).bookId} />
+      case 'admin-orders':
+        return <AdminOrderList />
+      default:
+        return <HomeView />
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <Navbar />
+      <main className="flex-1">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={route.page}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderView()}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+      <Footer />
+      <CartDrawer open={cartDrawerOpen} onOpenChange={setCartDrawerOpen} />
+    </div>
+  )
+}
+
+/* ─── Root Page ─── */
+export default function Home() {
+  return (
+    <SessionProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <RouterProvider>
+          <InnerWithCart />
+        </RouterProvider>
+      </ThemeProvider>
+    </SessionProvider>
+  )
+}
+
+function InnerWithCart() {
+  const { data: session } = useSession()
+  const isLoggedIn = !!session?.user
+
+  return (
+    <CartProvider isLoggedIn={isLoggedIn}>
+      <AppContent />
+    </CartProvider>
+  )
+}

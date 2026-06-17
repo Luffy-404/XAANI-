@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String?
+  password      String?
+  image         String?
+  role          String     @default("CUSTOMER")
+  emailVerified DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  orders        Order[]
+  cartItems     CartItem[]
+}
+
+model Category {
+  id        String @id @default(cuid())
+  name      String @unique
+  slug      String @unique
+  image     String?
+  books     Book[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Book {
+  id            String     @id @default(cuid())
+  title         String
+  slug          String     @unique
+  author        String
+  description   String
+  price         Float
+  discountPrice Float?
+  stock         Int        @default(0)
+  image         String
+  imageUrl      String     @default("/images/placeholders/product-placeholder.svg")
+  featured      Boolean    @default(false)
+  published     Boolean    @default(true)
+  rating        Float      @default(0)
+  categoryId    String
+  category      Category   @relation(fields: [categoryId], references: [id])
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model CartItem {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId   String
+  book     Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  quantity Int    @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, bookId])
+}
+
+model Order {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  total     Float
+  status    String     @default("pending")
+  paymentMethod String  @default("COD")
+  address   String
+  city      String
+  state     String?
+  zip       String
+  country   String
+  items     OrderItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bookId  String
+  book    Book   @relation(fields: [bookId], references: [id])
+  quantity Int
+  price   Float
+  title   String
+  author  String
+  image   String
+}
